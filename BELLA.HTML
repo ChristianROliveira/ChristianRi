@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Controle de Gastos</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -20,6 +20,7 @@
       padding: 20px;
       background: var(--bg);
       color: var(--text);
+      overflow-x: hidden;
     }
     h1, h2 {
       color: var(--text);
@@ -36,6 +37,8 @@
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
+      flex: 1 1 auto;
+      min-width: 100px;
     }
     .tabs button.active {
       background: var(--primary);
@@ -48,6 +51,9 @@
       margin-top: 10px;
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
     }
     .tab-content.active {
       display: block;
@@ -63,16 +69,31 @@
       margin-top: 4px;
       border: 1px solid #ccc;
       border-radius: 6px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    input[type=number] {
+      /* Evitar zoom iOS */
+      inputmode: decimal;
+      pattern: "[0-9]*";
+    }
+    .checkbox-group {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
     .btn {
       margin-top: 15px;
-      padding: 10px 20px;
+      padding: 12px 24px;
       background: var(--primary);
       color: white;
       border: none;
       border-radius: 6px;
       font-weight: bold;
       cursor: pointer;
+      font-size: 16px;
+      width: 100%;
     }
     .summary p {
       margin: 8px 0;
@@ -85,6 +106,16 @@
     @media (max-width: 600px) {
       .tabs {
         flex-direction: column;
+      }
+      .tab-content {
+        padding: 15px;
+        margin: 10px 0;
+      }
+      input, select {
+        font-size: 18px;
+      }
+      .btn {
+        font-size: 18px;
       }
     }
   </style>
@@ -106,15 +137,31 @@
   <div id="transacao" class="tab-content">
     <h2>Adicionar Transação</h2>
     <form id="formTransacao">
-      <label>Descrição<input type="text" id="descricao" required></label>
-      <label>Valor (R$)<input type="number" id="valor" required></label>
-      <label>Categoria<input type="text" id="categoria" required></label>
-      <label>Mês<select id="mes"></select></label>
-      <label>Tipo<select id="tipo">
-        <option value="entrada">Entrada</option>
-        <option value="saida">Saída</option>
-      </select></label>
-      <label>Número de Parcelas<input type="number" id="parcelas" value="1" min="1"></label>
+      <label>Descrição
+        <input type="text" id="descricao" required />
+      </label>
+      <label>Valor (R$)
+        <input type="number" id="valor" required inputmode="decimal" pattern="[0-9]*" step="0.01" />
+      </label>
+      <label>Categoria
+        <input type="text" id="categoria" required />
+      </label>
+      <label>Mês
+        <select id="mes"></select>
+      </label>
+      <label>Tipo
+        <select id="tipo">
+          <option value="entrada">Entrada</option>
+          <option value="saida">Saída</option>
+        </select>
+      </label>
+      <div class="checkbox-group">
+        <input type="checkbox" id="recorrente" />
+        <label for="recorrente" style="margin:0; font-weight:normal;">É recorrente (ex: salário)</label>
+      </div>
+      <label id="labelParcelas">Número de Parcelas (1 se única)
+        <input type="number" id="parcelas" value="1" min="1" />
+      </label>
       <button type="submit" class="btn">Salvar</button>
     </form>
   </div>
@@ -122,9 +169,15 @@
   <div id="metas" class="tab-content">
     <h2>Definir Meta</h2>
     <form id="formMeta">
-      <label>Categoria<input type="text" id="metaCategoria" required></label>
-      <label>Valor (R$)<input type="number" id="metaValor" required></label>
-      <label>Mês<select id="metaMes"></select></label>
+      <label>Categoria
+        <input type="text" id="metaCategoria" required />
+      </label>
+      <label>Valor (R$)
+        <input type="number" id="metaValor" required inputmode="decimal" pattern="[0-9]*" step="0.01" />
+      </label>
+      <label>Mês
+        <select id="metaMes"></select>
+      </label>
       <button type="submit" class="btn">Salvar Meta</button>
     </form>
     <div id="listaMetas" class="summary"></div>
@@ -134,38 +187,46 @@
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
     let transacoes = {};
     let metas = {};
+    let recorrentes = []; // transações recorrentes mensais
     let parcelasPendentes = [];
 
     const chartCtx = document.getElementById('grafico').getContext('2d');
     let chart;
 
     function initSelects() {
-      const mesSelects = [document.getElementById('mes'), document.getElementById('metaMes')];
-      mesSelects.forEach(select => {
+      [document.getElementById('mes'), document.getElementById('metaMes')].forEach(select => {
         select.innerHTML = '';
-        meses.forEach(m => {
-          const opt = new Option(m, m);
-          select.appendChild(opt);
-        });
+        meses.forEach(m => select.appendChild(new Option(m, m)));
       });
     }
 
     function carregarDados() {
       transacoes = JSON.parse(localStorage.getItem('transacoes')) || {};
       metas = JSON.parse(localStorage.getItem('metas')) || {};
+      recorrentes = JSON.parse(localStorage.getItem('recorrentes')) || [];
       parcelasPendentes = JSON.parse(localStorage.getItem('parcelasPendentes')) || [];
-      meses.forEach(m => transacoes[m] = transacoes[m] || { entradas: 0, saidas: 0 });
+      meses.forEach(m => {
+        if (!transacoes[m]) transacoes[m] = { entradas: 0, saidas: 0 };
+      });
     }
 
     function salvarDados() {
-      localStorage.setItem('transacoes', JSON.stringify(transacoes));
-      localStorage.setItem('metas', JSON.stringify(metas));
-      localStorage.setItem('parcelasPendentes', JSON.stringify(parcelasPendentes));
+      try {
+        localStorage.setItem('transacoes', JSON.stringify(transacoes));
+        localStorage.setItem('metas', JSON.stringify(metas));
+        localStorage.setItem('recorrentes', JSON.stringify(recorrentes));
+        localStorage.setItem('parcelasPendentes', JSON.stringify(parcelasPendentes));
+      } catch(e) {
+        alert('Erro ao salvar dados: ' + e.message);
+      }
     }
 
+    // Atualiza as parcelas pendentes e as recorrentes todo dia 1 (ideal: rodar em um servidor, aqui simulado ao abrir)
     function atualizarParcelas() {
       const hoje = new Date();
       if (hoje.getDate() !== 1) return;
+
+      // Parcelas
       parcelasPendentes.forEach(p => {
         if (p.restantes > 0) {
           transacoes[p.mesAtual][p.tipo === 'entrada' ? 'entradas' : 'saidas'] += p.valorMensal;
@@ -173,6 +234,13 @@
           p.mesAtual = proximoMes(p.mesAtual);
         }
       });
+
+      // Recorrentes (exemplo: salário todo mês, sempre no mês atual)
+      const mesAtual = meses[hoje.getMonth()];
+      recorrentes.forEach(r => {
+        transacoes[mesAtual][r.tipo === 'entrada' ? 'entradas' : 'saidas'] += r.valor;
+      });
+
       salvarDados();
     }
 
@@ -222,6 +290,21 @@
       }
     }
 
+    // Controlar o label do número de parcelas quando marcada a recorrente
+    document.getElementById('recorrente').addEventListener('change', (e) => {
+      const parcelasInput = document.getElementById('parcelas');
+      const labelParcelas = document.getElementById('labelParcelas');
+      if (e.target.checked) {
+        parcelasInput.value = 1;
+        parcelasInput.disabled = true;
+        labelParcelas.textContent = 'Número de Parcelas (Desabilitado para recorrente)';
+      } else {
+        parcelasInput.disabled = false;
+        labelParcelas.textContent = 'Número de Parcelas (1 se única)';
+      }
+    });
+
+    // Tabs
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -232,43 +315,69 @@
       };
     });
 
+    // Envio formulário transação
     document.getElementById('formTransacao').onsubmit = e => {
       e.preventDefault();
       const mes = document.getElementById('mes').value;
       const tipo = document.getElementById('tipo').value;
       const valor = parseFloat(document.getElementById('valor').value);
+      const descricao = document.getElementById('descricao').value.trim();
+      const categoria = document.getElementById('categoria').value.trim();
+      const recorrente = document.getElementById('recorrente').checked;
       const parcelas = parseInt(document.getElementById('parcelas').value);
-      const valorParcela = +(valor / parcelas).toFixed(2);
 
-      if (parcelas === 1) {
-        transacoes[mes][tipo === 'entrada' ? 'entradas' : 'saidas'] += valor;
+      if (!descricao || !categoria || isNaN(valor) || valor <= 0) {
+        alert('Preencha todos os campos corretamente.');
+        return;
+      }
+
+      if (recorrente) {
+        // adiciona na lista recorrentes
+        recorrentes.push({ descricao, categoria, tipo, valor });
       } else {
-        parcelasPendentes.push({
-          descricao: document.getElementById('descricao').value,
-          valorMensal: valorParcela,
-          tipo,
-          mesAtual: mes,
-          restantes: parcelas
-        });
+        if (parcelas === 1) {
+          transacoes[mes][tipo === 'entrada' ? 'entradas' : 'saidas'] += valor;
+        } else {
+          parcelasPendentes.push({
+            descricao,
+            categoria,
+            valorMensal: +(valor / parcelas).toFixed(2),
+            tipo,
+            mesAtual: mes,
+            restantes: parcelas
+          });
+        }
       }
 
       salvarDados();
       e.target.reset();
+      document.getElementById('parcelas').disabled = false;
+      document.getElementById('labelParcelas').textContent = 'Número de Parcelas (1 se única)';
       atualizarResumo();
+      alert('Transação adicionada com sucesso!');
     };
 
+    // Envio formulário metas
     document.getElementById('formMeta').onsubmit = e => {
       e.preventDefault();
       const mes = document.getElementById('metaMes').value;
-      const categoria = document.getElementById('metaCategoria').value;
+      const categoria = document.getElementById('metaCategoria').value.trim();
       const valor = parseFloat(document.getElementById('metaValor').value);
+
+      if (!categoria || isNaN(valor) || valor <= 0) {
+        alert('Preencha todos os campos da meta corretamente.');
+        return;
+      }
+
       metas[mes] = metas[mes] || {};
       metas[mes][categoria] = valor;
       salvarDados();
       e.target.reset();
       atualizarMetas();
+      alert('Meta salva com sucesso!');
     };
 
+    // Inicialização
     initSelects();
     carregarDados();
     atualizarParcelas();

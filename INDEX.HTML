@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Controle de Gastos</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
@@ -82,6 +82,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      font-weight: normal;
     }
     .btn {
       margin-top: 15px;
@@ -137,31 +138,32 @@
   <div id="transacao" class="tab-content">
     <h2>Adicionar Transação</h2>
     <form id="formTransacao">
-      <label>Descrição
-        <input type="text" id="descricao" required />
-      </label>
-      <label>Valor (R$)
-        <input type="number" id="valor" required inputmode="decimal" pattern="[0-9]*" step="0.01" />
-      </label>
-      <label>Categoria
-        <input type="text" id="categoria" required />
-      </label>
-      <label>Mês
-        <select id="mes"></select>
-      </label>
-      <label>Tipo
-        <select id="tipo">
-          <option value="entrada">Entrada</option>
-          <option value="saida">Saída</option>
-        </select>
-      </label>
+      <label for="descricao">Descrição</label>
+      <input type="text" id="descricao" required />
+
+      <label for="valor">Valor (R$)</label>
+      <input type="number" id="valor" required inputmode="decimal" pattern="[0-9]*" step="0.01" />
+
+      <label for="categoria">Categoria</label>
+      <input type="text" id="categoria" required />
+
+      <label for="mes">Mês</label>
+      <select id="mes"></select>
+
+      <label for="tipo">Tipo</label>
+      <select id="tipo">
+        <option value="entrada">Entrada</option>
+        <option value="saida">Saída</option>
+      </select>
+
       <div class="checkbox-group">
         <input type="checkbox" id="recorrente" />
-        <label for="recorrente" style="margin:0; font-weight:normal;">É recorrente (ex: salário)</label>
+        <label for="recorrente">É recorrente (ex: salário)</label>
       </div>
-      <label id="labelParcelas">Número de Parcelas (1 se única)
-        <input type="number" id="parcelas" value="1" min="1" />
-      </label>
+
+      <label for="parcelas" id="labelParcelas">Número de Parcelas (1 se única)</label>
+      <input type="number" id="parcelas" value="1" min="1" />
+
       <button type="submit" class="btn">Salvar</button>
     </form>
   </div>
@@ -169,15 +171,15 @@
   <div id="metas" class="tab-content">
     <h2>Definir Meta</h2>
     <form id="formMeta">
-      <label>Categoria
-        <input type="text" id="metaCategoria" required />
-      </label>
-      <label>Valor (R$)
-        <input type="number" id="metaValor" required inputmode="decimal" pattern="[0-9]*" step="0.01" />
-      </label>
-      <label>Mês
-        <select id="metaMes"></select>
-      </label>
+      <label for="metaCategoria">Categoria</label>
+      <input type="text" id="metaCategoria" required />
+
+      <label for="metaValor">Valor (R$)</label>
+      <input type="number" id="metaValor" required inputmode="decimal" pattern="[0-9]*" step="0.01" />
+
+      <label for="metaMes">Mês</label>
+      <select id="metaMes"></select>
+
       <button type="submit" class="btn">Salvar Meta</button>
     </form>
     <div id="listaMetas" class="summary"></div>
@@ -187,12 +189,13 @@
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
     let transacoes = {};
     let metas = {};
-    let recorrentes = []; // transações recorrentes mensais
+    let recorrentes = [];
     let parcelasPendentes = [];
 
     const chartCtx = document.getElementById('grafico').getContext('2d');
     let chart;
 
+    // Inicializa selects de meses
     function initSelects() {
       [document.getElementById('mes'), document.getElementById('metaMes')].forEach(select => {
         select.innerHTML = '';
@@ -200,6 +203,7 @@
       });
     }
 
+    // Carrega dados do localStorage ou inicializa
     function carregarDados() {
       transacoes = JSON.parse(localStorage.getItem('transacoes')) || {};
       metas = JSON.parse(localStorage.getItem('metas')) || {};
@@ -210,6 +214,7 @@
       });
     }
 
+    // Salva dados no localStorage
     function salvarDados() {
       try {
         localStorage.setItem('transacoes', JSON.stringify(transacoes));
@@ -221,12 +226,12 @@
       }
     }
 
-    // Atualiza as parcelas pendentes e as recorrentes todo dia 1 (ideal: rodar em um servidor, aqui simulado ao abrir)
+    // Atualiza parcelas e recorrentes no dia 1 (simulado ao abrir)
     function atualizarParcelas() {
       const hoje = new Date();
       if (hoje.getDate() !== 1) return;
 
-      // Parcelas
+      // Atualiza parcelas
       parcelasPendentes.forEach(p => {
         if (p.restantes > 0) {
           transacoes[p.mesAtual][p.tipo === 'entrada' ? 'entradas' : 'saidas'] += p.valorMensal;
@@ -235,7 +240,7 @@
         }
       });
 
-      // Recorrentes (exemplo: salário todo mês, sempre no mês atual)
+      // Atualiza recorrentes
       const mesAtual = meses[hoje.getMonth()];
       recorrentes.forEach(r => {
         transacoes[mesAtual][r.tipo === 'entrada' ? 'entradas' : 'saidas'] += r.valor;
@@ -244,22 +249,26 @@
       salvarDados();
     }
 
+    // Retorna o próximo mês da lista
     function proximoMes(mes) {
       const i = meses.indexOf(mes);
       return meses[(i + 1) % 12];
     }
 
+    // Atualiza resumo e gráfico
     function atualizarResumo() {
       const resumo = document.getElementById('resumoDados');
       resumo.innerHTML = '';
-      const entradas = [], saidas = [];
+      const entradas = [];
+      const saidas = [];
       meses.forEach(mes => {
-        const { entradas: e, saidas: s } = transacoes[mes];
+        const { entradas: e = 0, saidas: s = 0 } = transacoes[mes] || {};
         const saldo = e - s;
         entradas.push(e);
         saidas.push(s);
         resumo.innerHTML += `<p><strong>${mes}:</strong> Entradas: R$ ${e.toFixed(2)}, Saídas: R$ ${s.toFixed(2)}, Saldo: R$ ${saldo.toFixed(2)}</p>`;
       });
+
       if (chart) chart.destroy();
       chart = new Chart(chartCtx, {
         type: 'bar',
@@ -272,13 +281,12 @@
         },
         options: {
           responsive: true,
-          scales: {
-            y: { beginAtZero: true }
-          }
+          scales: { y: { beginAtZero: true } }
         }
       });
     }
 
+    // Atualiza lista de metas
     function atualizarMetas() {
       const lista = document.getElementById('listaMetas');
       lista.innerHTML = '';
@@ -290,8 +298,8 @@
       }
     }
 
-    // Controlar o label do número de parcelas quando marcada a recorrente
-    document.getElementById('recorrente').addEventListener('change', (e) => {
+    // Controla habilitação do campo parcelas conforme checkbox recorrente
+    document.getElementById('recorrente').addEventListener('change', e => {
       const parcelasInput = document.getElementById('parcelas');
       const labelParcelas = document.getElementById('labelParcelas');
       if (e.target.checked) {
@@ -304,7 +312,7 @@
       }
     });
 
-    // Tabs
+    // Troca de abas
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -315,7 +323,7 @@
       };
     });
 
-    // Envio formulário transação
+    // Salva transação
     document.getElementById('formTransacao').onsubmit = e => {
       e.preventDefault();
       const mes = document.getElementById('mes').value;
@@ -332,7 +340,6 @@
       }
 
       if (recorrente) {
-        // adiciona na lista recorrentes
         recorrentes.push({ descricao, categoria, tipo, valor });
       } else {
         if (parcelas === 1) {
@@ -351,13 +358,17 @@
 
       salvarDados();
       e.target.reset();
+
+      // Reset campo parcelas
       document.getElementById('parcelas').disabled = false;
       document.getElementById('labelParcelas').textContent = 'Número de Parcelas (1 se única)';
+      document.getElementById('recorrente').checked = false;
+
       atualizarResumo();
       alert('Transação adicionada com sucesso!');
     };
 
-    // Envio formulário metas
+    // Salva metas
     document.getElementById('formMeta').onsubmit = e => {
       e.preventDefault();
       const mes = document.getElementById('metaMes').value;

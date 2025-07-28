@@ -1,68 +1,279 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IZABELLA</title>
-</head>
-
-<body>
-    <div id="conteudo">
-        <h2>Aceita namorar comigo?</h2>
-        <div style="margin: auto;width: 170px;">
-            <button style="position: fixed;display: block;" class="btn" onclick="sim()">SIM</button>
-            <button class="btn" onclick="desvia(this)" onmouseover="desvia(this)" style="position: absolute;">NÃO</button>
-        </div>
-    </div>
-</body>
-<style>
-    #conteudo {
-        background: #ff7a7a;
-        width: 100%;
-        height: 100%;
-        position: fixed;
-        top: 0;
-        left: 0;
-        padding: 10px;
-        text-align: center;
-        font-family: sans-serif;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Controle de Gastos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f9f9f9;
+      --card: #fff;
+      --primary: #28a745;
+      --danger: #dc3545;
+      --text: #333;
     }
-
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: var(--bg);
+      color: var(--text);
+    }
+    h1, h2 {
+      color: var(--text);
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tabs button {
+      padding: 10px 16px;
+      border: none;
+      background: #e0e0e0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .tabs button.active {
+      background: var(--primary);
+      color: white;
+    }
+    .tab-content {
+      display: none;
+      background: var(--card);
+      padding: 20px;
+      margin-top: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .tab-content.active {
+      display: block;
+    }
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: 600;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 4px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
     .btn {
-        background: black;
-        color: white;
-        border: none;
-        padding: 10px;
-        width: 80px;
-        border-radius: 5px;
+      margin-top: 15px;
+      padding: 10px 20px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
     }
-</style>
+    .summary p {
+      margin: 8px 0;
+    }
+    canvas {
+      width: 100% !important;
+      max-width: 100%;
+      height: auto !important;
+    }
+    @media (max-width: 600px) {
+      .tabs {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>💸 Controle de Gastos</h1>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="resumo">📊 Resumo</button>
+    <button class="tab-btn" data-tab="transacao">➕ Nova Transação</button>
+    <button class="tab-btn" data-tab="metas">🎯 Metas</button>
+  </div>
 
-<script>
-    function sim() {
-        alert("Te vejo mais tarde! ♥ ");
-        // redireciona para um URL após clicar no SIM
-        location.href = "https://open.spotify.com/intl-pt/track/4jDmJ51x1o9NZB5Nxxc7gY?si=6b428abd61eb4957";
+  <div id="resumo" class="tab-content active">
+    <h2>Resumo Mensal</h2>
+    <canvas id="grafico"></canvas>
+    <div id="resumoDados" class="summary"></div>
+  </div>
 
+  <div id="transacao" class="tab-content">
+    <h2>Adicionar Transação</h2>
+    <form id="formTransacao">
+      <label>Descrição<input type="text" id="descricao" required></label>
+      <label>Valor (R$)<input type="number" id="valor" required></label>
+      <label>Categoria<input type="text" id="categoria" required></label>
+      <label>Mês<select id="mes"></select></label>
+      <label>Tipo<select id="tipo">
+        <option value="entrada">Entrada</option>
+        <option value="saida">Saída</option>
+      </select></label>
+      <label>Número de Parcelas<input type="number" id="parcelas" value="1" min="1"></label>
+      <button type="submit" class="btn">Salvar</button>
+    </form>
+  </div>
+
+  <div id="metas" class="tab-content">
+    <h2>Definir Meta</h2>
+    <form id="formMeta">
+      <label>Categoria<input type="text" id="metaCategoria" required></label>
+      <label>Valor (R$)<input type="number" id="metaValor" required></label>
+      <label>Mês<select id="metaMes"></select></label>
+      <button type="submit" class="btn">Salvar Meta</button>
+    </form>
+    <div id="listaMetas" class="summary"></div>
+  </div>
+
+  <script>
+    const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    let transacoes = {};
+    let metas = {};
+    let parcelasPendentes = [];
+
+    const chartCtx = document.getElementById('grafico').getContext('2d');
+    let chart;
+
+    function initSelects() {
+      const mesSelects = [document.getElementById('mes'), document.getElementById('metaMes')];
+      mesSelects.forEach(select => {
+        select.innerHTML = '';
+        meses.forEach(m => {
+          const opt = new Option(m, m);
+          select.appendChild(opt);
+        });
+      });
     }
 
-    function desvia(btn) {
-        // btn declarado na função
-        btn.style.position = 'absolute';
-        btn.style.bottom = geraPosicao(10, 90);
-        btn.style.left = geraPosicao(10, 90);
-        console.log('opa, desviei...');
+    function carregarDados() {
+      transacoes = JSON.parse(localStorage.getItem('transacoes')) || {};
+      metas = JSON.parse(localStorage.getItem('metas')) || {};
+      parcelasPendentes = JSON.parse(localStorage.getItem('parcelasPendentes')) || [];
+      meses.forEach(m => transacoes[m] = transacoes[m] || { entradas: 0, saidas: 0 });
     }
 
-    function geraPosicao(min, max) {
-        return (Math.random() * (max - min) + min) + "%";
+    function salvarDados() {
+      localStorage.setItem('transacoes', JSON.stringify(transacoes));
+      localStorage.setItem('metas', JSON.stringify(metas));
+      localStorage.setItem('parcelasPendentes', JSON.stringify(parcelasPendentes));
     }
 
-   
-    const o = "MTHS1901", e = 90, l = "bold"; console.log(`%c${o}`, "font-size: 90px; font-weight: bold; background: linear-gradient(90deg, red, yellow);"), console.log("Tutorial: https://www.youtube.com/watch?v=zxxB9SFh9p4");
+    function atualizarParcelas() {
+      const hoje = new Date();
+      if (hoje.getDate() !== 1) return;
+      parcelasPendentes.forEach(p => {
+        if (p.restantes > 0) {
+          transacoes[p.mesAtual][p.tipo === 'entrada' ? 'entradas' : 'saidas'] += p.valorMensal;
+          p.restantes--;
+          p.mesAtual = proximoMes(p.mesAtual);
+        }
+      });
+      salvarDados();
+    }
 
-</script>
+    function proximoMes(mes) {
+      const i = meses.indexOf(mes);
+      return meses[(i + 1) % 12];
+    }
 
+    function atualizarResumo() {
+      const resumo = document.getElementById('resumoDados');
+      resumo.innerHTML = '';
+      const entradas = [], saidas = [];
+      meses.forEach(mes => {
+        const { entradas: e, saidas: s } = transacoes[mes];
+        const saldo = e - s;
+        entradas.push(e);
+        saidas.push(s);
+        resumo.innerHTML += `<p><strong>${mes}:</strong> Entradas: R$ ${e.toFixed(2)}, Saídas: R$ ${s.toFixed(2)}, Saldo: R$ ${saldo.toFixed(2)}</p>`;
+      });
+      if (chart) chart.destroy();
+      chart = new Chart(chartCtx, {
+        type: 'bar',
+        data: {
+          labels: meses,
+          datasets: [
+            { label: 'Entradas', data: entradas, backgroundColor: '#28a745' },
+            { label: 'Saídas', data: saidas, backgroundColor: '#dc3545' },
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function atualizarMetas() {
+      const lista = document.getElementById('listaMetas');
+      lista.innerHTML = '';
+      for (const mes in metas) {
+        lista.innerHTML += `<strong>${mes}</strong><br>`;
+        for (const cat in metas[mes]) {
+          lista.innerHTML += `${cat}: R$ ${metas[mes][cat]}<br>`;
+        }
+      }
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+        if (btn.dataset.tab === 'resumo') atualizarResumo();
+      };
+    });
+
+    document.getElementById('formTransacao').onsubmit = e => {
+      e.preventDefault();
+      const mes = document.getElementById('mes').value;
+      const tipo = document.getElementById('tipo').value;
+      const valor = parseFloat(document.getElementById('valor').value);
+      const parcelas = parseInt(document.getElementById('parcelas').value);
+      const valorParcela = +(valor / parcelas).toFixed(2);
+
+      if (parcelas === 1) {
+        transacoes[mes][tipo === 'entrada' ? 'entradas' : 'saidas'] += valor;
+      } else {
+        parcelasPendentes.push({
+          descricao: document.getElementById('descricao').value,
+          valorMensal: valorParcela,
+          tipo,
+          mesAtual: mes,
+          restantes: parcelas
+        });
+      }
+
+      salvarDados();
+      e.target.reset();
+      atualizarResumo();
+    };
+
+    document.getElementById('formMeta').onsubmit = e => {
+      e.preventDefault();
+      const mes = document.getElementById('metaMes').value;
+      const categoria = document.getElementById('metaCategoria').value;
+      const valor = parseFloat(document.getElementById('metaValor').value);
+      metas[mes] = metas[mes] || {};
+      metas[mes][categoria] = valor;
+      salvarDados();
+      e.target.reset();
+      atualizarMetas();
+    };
+
+    initSelects();
+    carregarDados();
+    atualizarParcelas();
+    atualizarResumo();
+    atualizarMetas();
+  </script>
+</body>
 </html>
